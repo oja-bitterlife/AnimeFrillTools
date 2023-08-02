@@ -18,15 +18,18 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
         AHT_FRILL_OT_remove_control_empty.remove(context, curve)
 
         # ポイントごとにEmpty生成
-        for point in spline.points:
+        for no, point in enumerate(spline.points):
             obj = bpy.data.objects.new("AFT_Empty", None)
             bpy.data.collections[context.scene.frill_empty_collection].objects.link(obj)
 
             obj.empty_display_size = 0.05
             obj.location = point.co.xyz
+            obj.rotation_euler[2] = point.tilt
+
 
             # リセット用
             obj["AFT_target_curve"] = curve
+            obj["AFT_point_no"] = no
             obj["AFT_org_pos"] = list(point.co.xyz)
             obj["AFT_org_tilt"] = point.tilt
 
@@ -63,29 +66,36 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
 # リセットボタン
 # *************************************************************************************************
 # 選択ポイントに結びついたEmptyを削除する
-class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
-    bl_idname = "aht_frill.remove_control_empty"
-    bl_label = "Remove Control Empty"
+class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
+    bl_idname = "aht_frill.reset_control_empty"
+    bl_label = "Reset Selected Targets"
 
     # execute
     def execute(self, context):
-        curve = context.view_layer.objects.active
-        AHT_FRILL_OT_remove_control_empty.remove(context, curve)
-        return{'FINISHED'}
-
-    @classmethod
-    def remove(cls, context, curve):
-        for obj in context.view_layer.objects:
+        for obj in context.selected_objects:
             if obj.type != 'EMPTY':
                 continue
 
             target_curve = obj.get("AFT_target_curve")
-            if target_curve == None or target_curve != curve:
+            if target_curve == None:
                 continue
 
-            # 削除対象
-            bpy.data.objects.remove(obj, do_unlink=True)
+            point_no = obj.get("AFT_point_no")
+            if point_no == None:
+                continue
 
+            # リセット対象だったのでリセット
+            org_pos = obj.get("AFT_org_pos")
+            if org_pos:
+                obj.location.x = org_pos[0]
+                obj.location.y = org_pos[1]
+                obj.location.z = org_pos[2]
+
+            org_tilt = obj.get("AFT_org_tilt")
+            if org_tilt:
+                obj.rotation_euler[2] = org_tilt
+
+        return{'FINISHED'}
 
 
 # Main UI
@@ -102,26 +112,40 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        if context.view_layer.objects.active == None or context.view_layer.objects.active.type != "CURVE":
-            layout.label(text="カーブを選択してください")
+        if context.view_layer.objects.active == None:
+            layout.label(text="カーブかターゲットを選択してください")
             return
-        curve = context.view_layer.objects.active
 
-        if len(curve.data.splines) != 1:
-            layout.label(text="カーブが1本ではありません")
-            return
-        spline = curve.data.splines[0]
+        # 選択ポイント数
+        if  context.view_layer.objects.active.type == "CURVE":
+            curve = context.view_layer.objects.active
+            if len(curve.data.splines) != 1:
+                layout.label(text="カーブが1本ではありません")
+                return
 
-        # オブジェクトモード用
-        if context.mode != "OBJECT" and context.mode != "EDIT_CURVE":
-            layout.enabled = False
+        # リセットボタンが押せるかチェック
+        row = layout.row()
+        if  context.view_layer.objects.active.type != "EMPTY":
+            row.enabled = False
+        row.operator("aht_frill.reset_control_empty")
 
         box = layout.box()
+
+        # コレクションの設定
         row = box.row()
         row.label(text="empty's place")
         row.prop(context.scene, "frill_empty_collection", text="")
-        box.operator("aht_frill.create_control_empty")
-        box.operator("aht_frill.remove_control_empty")
+
+        # 作成と削除
+        row = box.row()
+        if context.mode != "OBJECT":
+            row.enabled = False
+        row.operator("aht_frill.create_control_empty")
+
+        row = layout.row()
+        if context.mode != "OBJECT":
+            row.enabled = False
+        row.operator("aht_frill.remove_control_empty")
 
 
 # セレクトボックスに表示したい項目リストを作成する関数
