@@ -51,7 +51,13 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
         # Tiltにドライバを設定
         for no, point in enumerate(spline.points):
             driver = point.driver_add('tilt')
-
+            driver.driver.type = 'SCRIPTED'
+            var = driver.driver.variables.new()
+            var.name = 'var'
+            var.type = 'TRANSFORMS'
+            var.targets[0].id = PointEmptys[no]
+            var.targets[0].transform_type = 'ROT_Z'
+            driver.driver.expression = 'var'
 
         return{'FINISHED'}
 
