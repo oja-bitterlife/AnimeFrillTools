@@ -24,22 +24,23 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
         # ポイントごとにEmpty生成
         PointEmptys = []
         for no, point in enumerate(spline.points):
-            obj = bpy.data.objects.new(AFT_EMPTY_NAME, None)
-            bpy.data.collections[context.scene.frill_empty_collection].objects.link(obj)
+            empty = bpy.data.objects.new(AFT_EMPTY_NAME, None)
+            bpy.data.collections[context.scene.frill_empty_collection].objects.link(empty)
 
             # 初期設定
-            obj.empty_display_size = 0.05
-            obj.location = (curve_mat_world @ point.co).xyz
-            obj.rotation_euler[2] = point.tilt  # とりあえずZを使う
+            empty.empty_display_size = 0.05
+            empty.location = (curve_mat_world @ point.co).xyz
+            empty.rotation_euler[2] = point.tilt  # とりあえずZを使う
+            empty.show_in_front = True
 
             # リセット用
-            obj["AFT_target_curve"] = curve
-            obj["AFT_point_no"] = no
-            obj["AFT_org_pos"] = list(obj.location)
-            obj["AFT_org_tilt"] = point.tilt
+            empty["AFT_target_curve"] = curve
+            empty["AFT_point_no"] = no
+            empty["AFT_org_pos"] = list(empty.location)
+            empty["AFT_org_tilt"] = point.tilt
 
             # この後の設定用にリスト保存
-            PointEmptys.append(obj)
+            PointEmptys.append(empty)
 
         # Hookの追加
         for no, point in enumerate(spline.points):
