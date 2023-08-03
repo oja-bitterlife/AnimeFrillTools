@@ -17,7 +17,6 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
         curve = context.view_layer.objects.active
         spline = curve.data.splines[0]
         curve_mat_world = curve.matrix_world
-        print(curve.matrix_world)
 
         # 先に一旦削除
         AHT_FRILL_OT_remove_control_empty.remove(context, curve)
@@ -42,12 +41,17 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
             # この後の設定用にリスト保存
             PointEmptys.append(obj)
 
-        # 各Pointと対応するEmptyを設定する
+        # Hookの追加
         for no, point in enumerate(spline.points):
             hook = curve.modifiers.new("AFT_Hook", 'HOOK')
             hook.object = PointEmptys[no]
             hook.vertex_indices_set([no])
             hook.matrix_inverse = mathutils.Matrix.Translation(-point.co.xyz)
+
+        # Tiltにドライバを設定
+        for no, point in enumerate(spline.points):
+            driver = point.driver_add('tilt')
+
 
         return{'FINISHED'}
 
@@ -83,6 +87,11 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
         for mod in curve.modifiers:
             if mod.name.startswith(AFT_EMPTY_HOOK_NAME):
                 curve.modifiers.remove(mod)
+
+        # driverも削除
+        spline = curve.data.splines[0]
+        for no, point in enumerate(spline.points):
+            point.driver_remove('tilt')
 
 
 # リセットボタン
