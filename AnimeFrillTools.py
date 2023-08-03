@@ -1,6 +1,8 @@
 import bpy
 
 # 定数
+AFT_EMPTY_NAME = "AFT_Empty"
+
 
 # 作成ボタン
 # *************************************************************************************************
@@ -19,13 +21,13 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
 
         # ポイントごとにEmpty生成
         for no, point in enumerate(spline.points):
-            obj = bpy.data.objects.new("AFT_Empty", None)
+            obj = bpy.data.objects.new(AFT_EMPTY_NAME, None)
             bpy.data.collections[context.scene.frill_empty_collection].objects.link(obj)
 
+            # 初期設定
             obj.empty_display_size = 0.05
             obj.location = point.co.xyz
-            obj.rotation_euler[2] = point.tilt
-
+            obj.rotation_euler[2] = point.tilt  # とりあえずZを使う
 
             # リセット用
             obj["AFT_target_curve"] = curve
@@ -55,6 +57,7 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
             if obj.type != 'EMPTY':
                 continue
 
+            # 対象のCurveかチェック
             target_curve = obj.get("AFT_target_curve")
             if target_curve == None or target_curve != curve:
                 continue
@@ -72,14 +75,17 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
 
     # execute
     def execute(self, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
         for obj in context.selected_objects:
             if obj.type != 'EMPTY':
                 continue
 
+            # 対象のCurveかチェック
             target_curve = obj.get("AFT_target_curve")
             if target_curve == None:
                 continue
 
+            # 対象ポイント番号は必ずあるはずだけど、ないと操作しようがないので(フェイルセーフ)
             point_no = obj.get("AFT_point_no")
             if point_no == None:
                 continue
