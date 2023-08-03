@@ -1,7 +1,8 @@
-import bpy
+import bpy, mathutils
 
 # 定数
 AFT_EMPTY_NAME = "AFT_Empty"
+AFT_EMPTY_HOOK_NAME = "AFT_Hook"
 
 
 # 作成ボタン
@@ -15,11 +16,13 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
     def execute(self, context):
         curve = context.view_layer.objects.active
         spline = curve.data.splines[0]
+        curve_mat_world = curve.matrix_world
 
         # 先に一旦削除
         AHT_FRILL_OT_remove_control_empty.remove(context, curve)
 
         # ポイントごとにEmpty生成
+        PointEmptys = []
         for no, point in enumerate(spline.points):
             obj = bpy.data.objects.new(AFT_EMPTY_NAME, None)
             bpy.data.collections[context.scene.frill_empty_collection].objects.link(obj)
@@ -35,6 +38,16 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
             obj["AFT_org_pos"] = list(point.co.xyz)
             obj["AFT_org_tilt"] = point.tilt
 
+            # この後の設定用にリスト保存
+            PointEmptys.append(obj)
+
+        # 各Pointと対応するEmptyを設定する
+        for no, point in enumerate(spline.points):
+            hook = curve.modifiers.new("AFT_Hook", 'HOOK')
+            hook.object = PointEmptys[no]
+            hook.vertex_indices_set([no])
+            hook.matrix_inverse = mathutils.Matrix.Translation(-point.co.xyz)
+    
         return{'FINISHED'}
 
 
@@ -65,10 +78,15 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
             # 削除対象
             bpy.data.objects.remove(obj, do_unlink=True)
 
+        # hookも削除
+        for mod in curve.modifiers:
+            if mod.name.startswith(AFT_EMPTY_HOOK_NAME):
+                curve.modifiers.remove(mod)
+
 
 # リセットボタン
 # *************************************************************************************************
-# 選択ポイントに結びついたEmptyを削除する
+# Emptyをプロパティを元にリセットする
 class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.reset_control_empty"
     bl_label = "Reset Selected Targets"
@@ -100,7 +118,7 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
             org_tilt = obj.get("AFT_org_tilt")
             if org_tilt:
                 obj.rotation_euler[2] = org_tilt
-
+ 
         return{'FINISHED'}
 
 
