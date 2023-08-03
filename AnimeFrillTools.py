@@ -17,6 +17,7 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
         curve = context.view_layer.objects.active
         spline = curve.data.splines[0]
         curve_mat_world = curve.matrix_world
+        print(curve.matrix_world)
 
         # 先に一旦削除
         AHT_FRILL_OT_remove_control_empty.remove(context, curve)
@@ -29,13 +30,13 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
 
             # 初期設定
             obj.empty_display_size = 0.05
-            obj.location = point.co.xyz
+            obj.location = (curve_mat_world @ point.co).xyz
             obj.rotation_euler[2] = point.tilt  # とりあえずZを使う
 
             # リセット用
             obj["AFT_target_curve"] = curve
             obj["AFT_point_no"] = no
-            obj["AFT_org_pos"] = list(point.co.xyz)
+            obj["AFT_org_pos"] = list(obj.location)
             obj["AFT_org_tilt"] = point.tilt
 
             # この後の設定用にリスト保存
@@ -47,7 +48,7 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
             hook.object = PointEmptys[no]
             hook.vertex_indices_set([no])
             hook.matrix_inverse = mathutils.Matrix.Translation(-point.co.xyz)
-    
+
         return{'FINISHED'}
 
 
