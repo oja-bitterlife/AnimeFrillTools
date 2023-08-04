@@ -281,13 +281,14 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
         # ボタン表示
         # ---------------------------------------------------------------------
         # リセットボタンが押せるかチェック
+        layout.label(text="Reset Empty's transfrom")
         row = layout.row()
         if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
             row.enabled = False
         row.operator("aht_frill.reset_control_empty")
 
         # 作成と削除ボタンが押せるかチェック
-        layout.label(text="Create / Remove Control Empty")
+        layout.label(text="Create / Remove Control Empty from Curve")
         box = layout.box()
         if context.view_layer.objects.active.type != "CURVE" or context.mode != "OBJECT":  # Create/RemoveはCurve選択時のみ
             box.enabled = False
@@ -296,12 +297,13 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
 
         # ウエイト設定ボタンが押せるかチェック
         layout.label(text="Empty's weight copy from mesh vertex")
-        row = layout.row()
+        box = layout.box()
+        row = box.row()
         if context.view_layer.objects.active.type != "MESH" or context.mode != "EDIT_MESH":  # 設定ボタンはMesh選択時のみ
             row.enabled = False
         row.operator("aht_frill.create_empty_armature")
 
-        row = layout.row()
+        row = box.row()
         if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
             row.enabled = False
         row.operator("aht_frill.remove_empty_armature")
