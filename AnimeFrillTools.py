@@ -11,7 +11,7 @@ AFT_EMPTY_ARMATURE_NAME = "AFT_Armature"
 # 選択ポイントにコントロール用Emptyを作成する
 class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.create_control_empty"
-    bl_label = "Create Control Empty"
+    bl_label = "Create"
 
     # execute
     def execute(self, context):
@@ -78,7 +78,7 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
 # 選択ポイントに結びついたEmptyを削除する
 class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.remove_control_empty"
-    bl_label = "Remove Control Empty"
+    bl_label = "Remove"
 
     # execute
     def execute(self, context):
@@ -118,7 +118,7 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
 # Emptyをプロパティを元にリセットする
 class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.reset_control_empty"
-    bl_label = "Reset Selected Targets"
+    bl_label = "Reset"
 
     # execute
     def execute(self, context):
@@ -156,7 +156,7 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
 # EmptyにArmatureを設定する
 class AHT_FRILL_OT_create_empty_armature(bpy.types.Operator):
     bl_idname = "aht_frill.create_empty_armature"
-    bl_label = "Append Empty's Armature"
+    bl_label = "Create"
 
     # execute
     def execute(self, context):
@@ -231,7 +231,7 @@ def find_bones_armature(mesh, bone_name):
 # EmptyからArmatureを削除する
 class AHT_FRILL_OT_remove_empty_armature(bpy.types.Operator):
     bl_idname = "aht_frill.remove_empty_armature"
-    bl_label = "Remove Empty's Armature"
+    bl_label = "Remove"
 
     # execute
     def execute(self, context):
@@ -255,6 +255,53 @@ class AHT_FRILL_OT_remove_empty_armature(bpy.types.Operator):
                 if constraint.name.startswith(AFT_EMPTY_ARMATURE_NAME):
                     obj.constraints.remove(constraint)
 
+
+# ArmatureのEnable/Disable
+# *************************************************************************************************
+class AHT_FRILL_OT_enable_empty_armature(bpy.types.Operator):
+    bl_idname = "aht_frill.enable_empty_armature"
+    bl_label = "Enable"
+
+    # execute
+    def execute(self, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
+        for obj in context.selected_objects:
+            if obj == None or obj.type != 'EMPTY':
+                continue
+
+            # AFT用のEmptyかチェック
+            target_curve = obj.get("AFT_target_curve")
+            if target_curve == None:
+                continue
+
+            for constraint in obj.constraints:
+                if constraint.name.startswith(AFT_EMPTY_ARMATURE_NAME):
+                    constraint.enabled = True
+
+        return{'FINISHED'}
+
+
+class AHT_FRILL_OT_disable_empty_armature(bpy.types.Operator):
+    bl_idname = "aht_frill.disable_empty_armature"
+    bl_label = "Disable"
+
+    # execute
+    def execute(self, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
+        for obj in context.selected_objects:
+            if obj == None or obj.type != 'EMPTY':
+                continue
+
+            # AFT用のEmptyかチェック
+            target_curve = obj.get("AFT_target_curve")
+            if target_curve == None:
+                continue
+
+            for constraint in obj.constraints:
+                if constraint.name.startswith(AFT_EMPTY_ARMATURE_NAME):
+                    constraint.enabled = False
+
+        return{'FINISHED'}
 
 
 # Main UI
@@ -287,17 +334,28 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
             row.enabled = False
         row.operator("aht_frill.reset_control_empty")
 
+        # ArmatureのON/OFF
+        layout.label(text="Enable/Disable Empty's Armature")
+        box = layout.box()
+        if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
+            box.enabled = False
+        row = box.row()
+        row.operator("aht_frill.enable_empty_armature")
+        row.operator("aht_frill.disable_empty_armature")
+
+
         # 作成と削除ボタンが押せるかチェック
-        layout.label(text="Create / Remove Control Empty from Curve")
+        layout.label(text="Create/Remove Empty from Curve")
         box = layout.box()
         if context.view_layer.objects.active.type != "CURVE" or context.mode != "OBJECT":  # Create/RemoveはCurve選択時のみ
             box.enabled = False
-        box.operator("aht_frill.create_control_empty")
-        box.operator("aht_frill.remove_control_empty")
+        row = box.row()
+        row.operator("aht_frill.create_control_empty")
+        row.operator("aht_frill.remove_control_empty")
 
         # ウエイト設定ボタンが押せるかチェック
         layout.label(text="Empty's weight copy from mesh vertex")
-        box = layout.box()
+        box = layout.box().row()
         row = box.row()
         if context.view_layer.objects.active.type != "MESH" or context.mode != "EDIT_MESH":  # 設定ボタンはMesh選択時のみ
             row.enabled = False
