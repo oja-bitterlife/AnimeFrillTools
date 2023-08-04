@@ -3,6 +3,7 @@ import bpy, mathutils
 # 定数
 AFT_EMPTY_NAME = "AFT_Empty"
 AFT_EMPTY_HOOK_NAME = "AFT_Hook"
+AFT_EMPTY_ARMATURE_NAME = "AFT_Armature"
 
 
 # 作成ボタン
@@ -14,20 +15,31 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
 
     # execute
     def execute(self, context):
-        curve = context.view_layer.objects.active
+        # 先に一旦削除
+        for obj in context.selected_objects:
+            if obj and obj.type == 'CURVE':
+                AHT_FRILL_OT_remove_control_empty.remove(context, obj)
+        # create
+        for obj in context.selected_objects:
+            if obj and obj.type == 'CURVE':
+                AHT_FRILL_OT_create_control_empty.create(context, obj)
+
+        return{'FINISHED'}
+
+
+    @classmethod
+    def create(cls, context, curve):
         spline = curve.data.splines[0]
         curve_mat_world = curve.matrix_world
-
-        # 先に一旦削除
-        AHT_FRILL_OT_remove_control_empty.remove(context, curve)
 
         # ポイントごとにEmpty生成
         PointEmptys = []
         for no, point in enumerate(spline.points):
             empty = bpy.data.objects.new(AFT_EMPTY_NAME, None)
-            bpy.data.collections[context.scene.frill_empty_collection].objects.link(empty)
+            curve.users_collection[0].objects.link(empty)
 
             # 初期設定
+            empty.parent = curve
             empty.empty_display_size = 0.05
             empty.location = (curve_mat_world @ point.co).xyz
             empty.rotation_euler[2] = point.tilt  # とりあえずZを使う
@@ -60,8 +72,6 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
             var.targets[0].transform_type = 'ROT_Z'
             driver.driver.expression = 'var'
 
-        return{'FINISHED'}
-
 
 # 削除ボタン
 # *************************************************************************************************
@@ -72,14 +82,16 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
 
     # execute
     def execute(self, context):
-        curve = context.view_layer.objects.active
-        AHT_FRILL_OT_remove_control_empty.remove(context, curve)
+        for obj in context.selected_objects:
+            if obj.type == 'CURVE':
+                AHT_FRILL_OT_remove_control_empty.remove(context, obj)
         return{'FINISHED'}
 
     @classmethod
     def remove(cls, context, curve):
         for obj in context.view_layer.objects:
-            if obj.type != 'EMPTY':
+            # Emptyに対してのみ処理が行える
+            if obj == None or obj.type != 'EMPTY':
                 continue
 
             # 対象のCurveかチェック
@@ -112,10 +124,10 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
     def execute(self, context):
         # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
         for obj in context.selected_objects:
-            if obj.type != 'EMPTY':
+            if obj == None or obj.type != 'EMPTY':
                 continue
 
-            # 対象のCurveかチェック
+            # AFT用のEmptyかチェック
             target_curve = obj.get("AFT_target_curve")
             if target_curve == None:
                 continue
@@ -139,6 +151,64 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
         return{'FINISHED'}
 
 
+# アーマチュア設定ボタン
+# *************************************************************************************************
+# EmptyにArmatureを設定する
+class AHT_FRILL_OT_create_empty_armature(bpy.types.Operator):
+    bl_idname = "aht_frill.create_empty_armature"
+    bl_label = "Append Empty's Armature"
+
+    # execute
+    def execute(self, context):
+        AHT_FRILL_OT_remove_empty_armature.remove(context)
+        AHT_FRILL_OT_create_empty_armature.create(context)
+        return{'FINISHED'}
+
+    @classmethod
+    def create(cls, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
+        for obj in context.selected_objects:
+            if obj == None or obj.type != 'EMPTY':
+                continue
+
+            # AFT用のEmptyかチェック
+            target_curve = obj.get("AFT_target_curve")
+            if target_curve == None:
+                continue
+
+            constraint = obj.constraints.new(type='ARMATURE')
+            constraint.name = AFT_EMPTY_ARMATURE_NAME
+
+
+# EmptyからArmatureを削除する
+class AHT_FRILL_OT_remove_empty_armature(bpy.types.Operator):
+    bl_idname = "aht_frill.remove_empty_armature"
+    bl_label = "Remove Empty's Armature"
+
+    # execute
+    def execute(self, context):
+        AHT_FRILL_OT_remove_empty_armature.remove(context)
+        return{'FINISHED'}
+
+    @classmethod
+    def remove(cls, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
+        for obj in context.selected_objects:
+            if obj == None or obj.type != 'EMPTY':
+                continue
+
+            # AFT用のEmptyかチェック
+            target_curve = obj.get("AFT_target_curve")
+            if target_curve == None:
+                continue
+
+            # Armatureの削除
+            for constraint in obj.constraints:
+                if constraint.name.startswith(AFT_EMPTY_ARMATURE_NAME):
+                    obj.constraints.remove(constraint)
+
+
+
 # Main UI
 # ===========================================================================================
 # 3DView Tools Panel
@@ -153,50 +223,43 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        if context.view_layer.objects.active == None:
-            layout.label(text="カーブかターゲットを選択してください")
-            return
-
-        # 選択ポイント数
-        if  context.view_layer.objects.active.type == "CURVE":
+        # Curveは1本のみ対応
+        if context.view_layer.objects.active.type == "CURVE":
             curve = context.view_layer.objects.active
             if len(curve.data.splines) != 1:
                 layout.label(text="カーブが1本ではありません")
                 return
 
+        # ボタン表示
+        # ---------------------------------------------------------------------
         # リセットボタンが押せるかチェック
         row = layout.row()
-        if  context.view_layer.objects.active.type != "EMPTY":
+        if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
             row.enabled = False
         row.operator("aht_frill.reset_control_empty")
 
+        # 作成と削除ボタンが押せるかチェック
+        layout.label(text="Create / Remove Control Empty")
         box = layout.box()
+        if context.view_layer.objects.active.type != "CURVE" or context.mode != "OBJECT":  # Create/RemoveはCurve選択時のみ
+            box.enabled = False
+        box.operator("aht_frill.create_control_empty")
+        box.operator("aht_frill.remove_control_empty")
 
-        # コレクションの設定
-        row = box.row()
-        row.label(text="empty's place")
-        row.prop(context.scene, "frill_empty_collection", text="")
-
-        # 作成と削除
-        row = box.row()
-        if context.mode != "OBJECT":
+        # ウエイト設定ボタンが押せるかチェック
+        layout.label(text="Empty's weight copy from mesh vertex")
+        row = layout.row()
+        if context.view_layer.objects.active.type != "MESH" or context.mode != "EDIT_MESH":  # 設定ボタンはMesh選択時のみ
             row.enabled = False
-        row.operator("aht_frill.create_control_empty")
+        row.operator("aht_frill.create_empty_armature")
 
         row = layout.row()
-        if context.mode != "OBJECT":
+        if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
             row.enabled = False
-        row.operator("aht_frill.remove_control_empty")
+        row.operator("aht_frill.remove_empty_armature")
 
-
-# セレクトボックスに表示したい項目リストを作成する関数
-def get_collection_list(scene, context):
-    # list[(id, text, desc)]
-    items = [(collection.name, collection.name, "") for collection in bpy.data.collections]
-    items = [("", "Choose Collection", "")] + items
-    return items
 
 # 設定用データ
 # =================================================================================================
 def register():
-    bpy.types.Scene.frill_empty_collection = bpy.props.EnumProperty(name = "Collection Name", description = "Collection Name", items = get_collection_list)
+    pass
