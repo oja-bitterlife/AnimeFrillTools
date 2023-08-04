@@ -160,12 +160,32 @@ class AHT_FRILL_OT_create_empty_armature(bpy.types.Operator):
 
     # execute
     def execute(self, context):
+        bpy.context.edit_object.update_from_editmode()  # 複数オブジェクト選択時は、更新しておかないとselectが上手く取得できない
+
+        # メッシュが選択されていた
+        selected = None
+        for v in context.view_layer.objects.active.data.vertices:
+            if v.select:
+                if selected != None:
+                    self.report({'ERROR'}, "転送元頂点は1つだけ選択してください")
+                    return{'FINISHED'}
+                selected = v
+
+        if selected == None:
+            self.report({'ERROR'}, "転送元頂点を1つ選択してください")
+            return{'FINISHED'}
+
+        # 一旦削除
         AHT_FRILL_OT_remove_empty_armature.remove(context)
-        AHT_FRILL_OT_create_empty_armature.create(context)
+        # 追加
+        AHT_FRILL_OT_create_empty_armature.create(context, list(selected.groups))
+
         return{'FINISHED'}
 
     @classmethod
-    def create(cls, context):
+    def create(cls, context, vertex_groups):
+        mesh = context.view_layer.objects.active
+
         # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
         for obj in context.selected_objects:
             if obj == None or obj.type != 'EMPTY':
@@ -176,9 +196,37 @@ class AHT_FRILL_OT_create_empty_armature(bpy.types.Operator):
             if target_curve == None:
                 continue
 
+            # Armature追加
+            # -----------------------------------------------------------------
             constraint = obj.constraints.new(type='ARMATURE')
             constraint.name = AFT_EMPTY_ARMATURE_NAME
 
+            # 頂点グループ全部登録
+            for vg in vertex_groups:
+                weight = vg.weight
+                bone_name = mesh.vertex_groups[vg.group].name
+                armature, bone = find_bones_armature(mesh, bone_name)
+
+                # コントロールボーンだった
+                if armature == None or bone == None:
+                    continue  # 登録しない(デフォームボーンのみ)
+
+                # 頂点グループごとにボーンを設定
+                target = constraint.targets.new()
+                target.target = context.scene.objects.get(armature.name)
+                target.subtarget = bone.name
+                target.weight = weight
+                
+
+def find_bones_armature(mesh, bone_name):
+    for modifier in mesh.modifiers:
+        if modifier.type == 'ARMATURE' and modifier.object:
+            armature = modifier.object.data
+
+            for bone in armature.bones:
+                if bone.use_deform and bone.name in bone_name:
+                    return (armature, bone)
+    return (None, None)
 
 # EmptyからArmatureを削除する
 class AHT_FRILL_OT_remove_empty_armature(bpy.types.Operator):
