@@ -156,7 +156,7 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
 # EmptyにArmatureを設定する
 class AHT_FRILL_OT_create_empty_armature(bpy.types.Operator):
     bl_idname = "aht_frill.create_empty_armature"
-    bl_label = "Create"
+    bl_label = "Append"
 
     # execute
     def execute(self, context):
