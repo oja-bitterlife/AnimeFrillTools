@@ -1,4 +1,4 @@
-import bpy, mathutils
+import bpy, mathutils, math
 
 # 定数
 AFT_EMPTY_NAME = "AFT_Empty"
@@ -48,8 +48,7 @@ class AHT_FRILL_OT_create_control_empty(bpy.types.Operator):
             # リセット用
             empty["AFT_target_curve"] = curve
             empty["AFT_point_no"] = no
-            empty["AFT_org_pos"] = list(empty.location)
-            empty["AFT_org_tilt"] = point.tilt
+            AHT_FRILL_OT_update_control_empty.update(context, empty)  # 残りはUpdateと同じ
 
             # この後の設定用にリスト保存
             PointEmptys.append(empty)
@@ -146,9 +145,42 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
 
             org_tilt = obj.get("AFT_org_tilt")
             if org_tilt:
-                obj.rotation_euler[2] = org_tilt
+                obj.rotation_euler[2] = org_tilt * math.pi / 180
  
         return{'FINISHED'}
+
+
+# プロパティをEmptyの状態で更新する
+class AHT_FRILL_OT_update_control_empty(bpy.types.Operator):
+    bl_idname = "aht_frill.update_control_empty"
+    bl_label = "Update"
+
+    # execute
+    def execute(self, context):
+        # アクティブだけじゃなくて選択中のEmpty全部対象にしちゃう
+        for obj in context.selected_objects:
+            if obj == None or obj.type != 'EMPTY':
+                continue
+
+            # AFT用のEmptyかチェック
+            target_curve = obj.get("AFT_target_curve")
+            if target_curve == None:
+                continue
+
+            # 対象ポイント番号は必ずあるはずだけど、ないと操作しようがないので(フェイルセーフ)
+            point_no = obj.get("AFT_point_no")
+            if point_no == None:
+                continue
+
+            AHT_FRILL_OT_update_control_empty.update(context, obj)
+
+        return{'FINISHED'}
+
+    @classmethod
+    def update(cls, context, empty):
+        # 更新
+        empty["AFT_org_pos"] = list(empty.location)
+        empty["AFT_org_tilt"] = empty.rotation_euler[2] * 180 / math.pi
 
 
 # アーマチュア設定ボタン
@@ -328,11 +360,13 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
         # ボタン表示
         # ---------------------------------------------------------------------
         # リセットボタンが押せるかチェック
-        layout.label(text="Reset Empty's transfrom")
+        layout.label(text="Reset/Update Empty's transfrom")
         row = layout.row()
-        if context.view_layer.objects.active.type != "EMPTY":  # リセットボタンはEmpty選択時のみ
+        if context.view_layer.objects.active.type != "EMPTY":  # リセット/更新ボタンはEmpty選択時のみ
             row.enabled = False
         row.operator("aht_frill.reset_control_empty")
+        row.operator("aht_frill.update_control_empty")
+
 
         # ArmatureのON/OFF
         layout.label(text="Enable/Disable Empty's Armature")
