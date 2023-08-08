@@ -117,7 +117,7 @@ class AHT_FRILL_OT_remove_control_empty(bpy.types.Operator):
 # Emptyをプロパティを元にリセットする
 class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.reset_control_empty"
-    bl_label = "Reset"
+    bl_label = "Load"
 
     # execute
     def execute(self, context):
@@ -153,7 +153,7 @@ class AHT_FRILL_OT_reset_control_empty(bpy.types.Operator):
 # プロパティをEmptyの状態で更新する
 class AHT_FRILL_OT_update_control_empty(bpy.types.Operator):
     bl_idname = "aht_frill.update_control_empty"
-    bl_label = "Update"
+    bl_label = "Store"
 
     # execute
     def execute(self, context):
@@ -360,10 +360,11 @@ class AHT_FRILL_PT_ui(bpy.types.Panel):
         # ボタン表示
         # ---------------------------------------------------------------------
         # リセットボタンが押せるかチェック
-        layout.label(text="Reset/Update Empty's transfrom")
-        row = layout.row()
+        layout.label(text="Empty's transform from property")
+        box = layout.box()
         if context.view_layer.objects.active.type != "EMPTY":  # リセット/更新ボタンはEmpty選択時のみ
-            row.enabled = False
+            box.enabled = False
+        row = box.row()
         row.operator("aht_frill.reset_control_empty")
         row.operator("aht_frill.update_control_empty")
 
